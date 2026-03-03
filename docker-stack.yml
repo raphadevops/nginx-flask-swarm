@@ -5,6 +5,10 @@ services:
     image: nginx-flask-swarm-backend:latest
     environment:
       - ENVIRONMENT=production
+      - DB_HOST=postgres
+      - DB_NAME=flaskdb
+      - DB_USER=flask
+      - DB_PASSWORD=flask123
     networks:
       - app_network
     deploy:
@@ -14,6 +18,21 @@ services:
       update_config:
         parallelism: 1
         delay: 10s
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=flaskdb
+      - POSTGRES_USER=flask
+      - POSTGRES_PASSWORD=flask123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
 
   nginx:
     image: nginx:1.25-alpine
@@ -31,3 +50,6 @@ services:
 networks:
   app_network:
     driver: overlay
+
+volumes:
+  postgres_data:
