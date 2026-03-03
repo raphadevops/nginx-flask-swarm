@@ -135,5 +135,3 @@ docker stack rm flask-swarm
 | Docker Swarm | - | Orquestração |
 
 ---
-
-**Autor:** raphabdev
