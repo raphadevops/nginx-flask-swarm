@@ -1,6 +1,6 @@
-# 🐳 Nginx + Flask com Docker Swarm
+# 🐳 Nginx + Flask + PostgreSQL com Docker Swarm
 
-Projeto de demonstração de uma arquitetura com **Nginx como reverse proxy** para uma aplicação **Python/Flask**, orquestrado via **Docker Swarm** com múltiplas réplicas e load balancing automático.
+Projeto de demonstração de uma arquitetura com **Nginx como reverse proxy** para uma aplicação **Python/Flask** conectada a um banco de dados **PostgreSQL**, orquestrado via **Docker Swarm** com múltiplas réplicas, load balancing automático e persistência de dados via volumes.
 
 ## 🏗️ Arquitetura
 
@@ -9,12 +9,19 @@ Projeto de demonstração de uma arquitetura com **Nginx como reverse proxy** pa
       HTTP :80      │             │     HTTP :5000
   ───────────────►  │    Nginx    │  ───────────────►  Flask Réplica 1
                     │  (Proxy +   │  ───────────────►  Flask Réplica 2
-                    │  LB)        │
-                    └─────────────┘
+                    │   LB)       │                         │
+                    └─────────────┘                         │
+                                                            ▼
+                                                       PostgreSQL
+                                                            │
+                                                            ▼
+                                                     Volume (dados
+                                                     persistidos)
 ```
 
-- **Nginx**: Recebe as requisições externas e distribui entre as réplicas via load balance
+- **Nginx**: Recebe requisições externas e distribui entre réplicas via load balance
 - **Flask + Gunicorn**: 2 réplicas rodando em paralelo gerenciadas pelo Swarm
+- **PostgreSQL**: Banco de dados com volume para persistência dos dados
 - **Docker Swarm**: Orquestra os serviços, garante disponibilidade e reinicia containers com falha
 - **Overlay Network**: Rede interna isolada para comunicação entre os serviços
 
@@ -58,7 +65,7 @@ docker stack deploy -c docker-stack.yml flask-swarm
 docker stack services flask-swarm
 ```
 
-Aguarde até aparecer `2/2` no backend e `1/1` no Nginx.
+Aguarde até aparecer `2/2` no backend, `1/1` no Nginx e `1/1` no PostgreSQL.
 
 ### Testando os endpoints
 
@@ -72,6 +79,12 @@ curl http://localhost/health
 # Informações da app
 curl http://localhost/info
 
+# Testa conexão com o banco
+curl http://localhost/db-test
+
+# Registra e conta visitas (persiste no banco)
+curl http://localhost/visitas
+
 # Health check do Nginx
 curl http://localhost/nginx-health
 ```
@@ -81,17 +94,20 @@ curl http://localhost/nginx-health
 Execute o comando abaixo várias vezes e observe o campo `hostname` mudando entre as réplicas:
 
 ```bash
-curl http://localhost/
+curl http://localhost/visitas
 ```
 
 ### Visualizando logs
 
 ```bash
-# Todos os serviços
-docker service logs flask-swarm_backend
-
-# Acompanhar em tempo real
+# Backend
 docker service logs -f flask-swarm_backend
+
+# PostgreSQL
+docker service logs -f flask-swarm_postgres
+
+# Nginx
+docker service logs -f flask-swarm_nginx
 ```
 
 ### Derrubando o stack
@@ -99,6 +115,14 @@ docker service logs -f flask-swarm_backend
 ```bash
 docker stack rm flask-swarm
 ```
+
+### Verificando o volume após derrubar o stack
+
+```bash
+docker volume ls
+```
+
+O volume `flask-swarm_postgres_data` persiste mesmo após o stack ser removido. Ao subir novamente, os dados estarão intactos.
 
 ## 📁 Estrutura do projeto
 
@@ -119,10 +143,12 @@ docker stack rm flask-swarm
 - **Docker Swarm** como orquestrador de containers
 - **Réplicas** — múltiplas instâncias do mesmo serviço
 - **Load Balancing** automático entre réplicas
+- **Docker Volumes** — persistência de dados do PostgreSQL
 - **Overlay Network** para comunicação entre serviços
 - **Restart Policy** para alta disponibilidade
 - **Update Config** para deploy sem downtime
 - **Reverse Proxy** com Nginx
+- **Variáveis de ambiente** para configuração por serviço
 
 ## 🛠️ Tecnologias
 
@@ -132,6 +158,5 @@ docker stack rm flask-swarm
 | Python | 3.12 Slim | Runtime |
 | Flask | 3.0.3 | Web Framework |
 | Gunicorn | 22.0.0 | WSGI Server |
+| PostgreSQL | 16 Alpine | Banco de Dados |
 | Docker Swarm | - | Orquestração |
-
----
