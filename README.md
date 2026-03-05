@@ -41,6 +41,13 @@ Projeto de demonstração de uma arquitetura com **Nginx como reverse proxy** pa
 - Docker >= 24.x
 - Docker Swarm ativo
 
+### Clonando o repositório
+
+```bash
+git clone https://github.com/raphabdev/nginx-flask-swarm.git
+cd nginx-flask-swarm
+```
+
 ### Ativando o Swarm
 
 ```bash
@@ -160,3 +167,7 @@ O volume `flask-swarm_postgres_data` persiste mesmo após o stack ser removido. 
 | Gunicorn | 22.0.0 | WSGI Server |
 | PostgreSQL | 16 Alpine | Banco de Dados |
 | Docker Swarm | - | Orquestração |
+
+---
+
+**Autor:** raphabdev
