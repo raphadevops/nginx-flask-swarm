@@ -169,5 +169,3 @@ O volume `flask-swarm_postgres_data` persiste mesmo após o stack ser removido. 
 | Docker Swarm | - | Orquestração |
 
 ---
-
-**Autor:** raphabdev
