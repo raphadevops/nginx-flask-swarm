@@ -50,7 +50,14 @@ A demonstration project of a distributed multi-container architecture using **Do
 - Docker >= 24.x with Swarm mode enabled
 - Docker Compose >= 2.x (for local build)
 
-### 1. Initialize Docker Swarm
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/raphadevops/nginx-flask-swarm.git
+cd nginx-flask-swarm
+```
+
+### 2. Initialize Docker Swarm
 
 ```bash
 docker swarm init
