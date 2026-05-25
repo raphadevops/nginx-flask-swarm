@@ -18,7 +18,8 @@ def home():
     return jsonify({
         "message": "API is running successfully!",
         "hostname": socket.gethostname(),
-        "environment": os.getenv("ENVIRONMENT", "development")
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "author": "raphadevops"
     })
 
 @app.route("/health")
