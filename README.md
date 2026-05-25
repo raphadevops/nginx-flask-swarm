@@ -1,171 +1,188 @@
-# 🐳 Nginx + Flask + PostgreSQL com Docker Swarm
+# 🐝 Nginx + Flask + PostgreSQL with Docker Swarm
 
-Projeto de demonstração de uma arquitetura com **Nginx como reverse proxy** para uma aplicação **Python/Flask** conectada a um banco de dados **PostgreSQL**, orquestrado via **Docker Swarm** com múltiplas réplicas, load balancing automático e persistência de dados via volumes.
+A demonstration project of a distributed multi-container architecture using **Docker Swarm** for orchestration, **Nginx** as a load balancer and reverse proxy, **Flask/Gunicorn** as the backend with **2 replicas**, and **PostgreSQL** for data persistence.
 
-## 🏗️ Arquitetura
+---
+
+## 🏗️ Architecture
 
 ```
-                    ┌─────────────┐
-      HTTP :80      │             │     HTTP :5000
-  ───────────────►  │    Nginx    │  ───────────────►  Flask Réplica 1
-                    │  (Proxy +   │  ───────────────►  Flask Réplica 2
-                    │   LB)       │                         │
-                    └─────────────┘                         │
-                                                            ▼
-                                                       PostgreSQL
-                                                            │
-                                                            ▼
-                                                     Volume (dados
-                                                     persistidos)
+                   ┌─────────────┐
+     HTTP :80      │             │    HTTP :5000     ┌─────────────────────┐
+ ──────────────►   │    Nginx    │ ────────────────► │  Flask replica 1    │
+                   │  (Proxy +   │                   └─────────────────────┘
+                   │  Balancer)  │                   ┌─────────────────────┐
+                   │             │ ────────────────► │  Flask replica 2    │
+                   └─────────────┘                   └──────────┬──────────┘
+                                                                │
+                                                                ▼
+                                                    ┌─────────────────────┐
+                                                    │   PostgreSQL :5432  │
+                                                    │  (persistent data)  │
+                                                    └─────────────────────┘
 ```
 
-- **Nginx**: Recebe requisições externas e distribui entre réplicas via load balance
-- **Flask + Gunicorn**: 2 réplicas rodando em paralelo gerenciadas pelo Swarm
-- **PostgreSQL**: Banco de dados com volume para persistência dos dados
-- **Docker Swarm**: Orquestra os serviços, garante disponibilidade e reinicia containers com falha
-- **Overlay Network**: Rede interna isolada para comunicação entre os serviços
-
-## 🔄 Diferença para o Docker Compose
-
-| | Docker Compose | Docker Swarm |
+| Component | Role | Replicas |
 |---|---|---|
-| Uso | Desenvolvimento local | Produção / Multi-nó |
-| Réplicas | Não | Sim |
-| Load Balance | Não | Automático |
-| Alta disponibilidade | Não | Sim |
-| Orquestração | Básica | Avançada |
+| **Nginx** | Load balancer + reverse proxy | 1 |
+| **Flask + Gunicorn** | Python backend with 2 Gunicorn workers | 2 |
+| **PostgreSQL** | Relational database with persistent volume | 1 |
 
-## 🚀 Como rodar
+---
 
-### Pré-requisitos
-- Docker >= 24.x
-- Docker Swarm ativo
+## 🆚 How this project differs from nginx-flask-docker
 
-### Clonando o repositório
+| Feature | nginx-flask-docker | nginx-flask-swarm |
+|---|---|---|
+| Orchestration | Docker Compose | Docker Swarm |
+| Network | bridge | overlay (multi-node) |
+| Flask replicas | 1 | 2 (load balanced) |
+| Database | — | PostgreSQL |
+| Dockerfile | Standard | Multi-stage build |
+| Rolling update | — | ✓ zero downtime |
 
-```bash
-git clone https://github.com/raphabdev/nginx-flask-swarm.git
-cd nginx-flask-swarm
-```
+---
 
-### Ativando o Swarm
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Docker >= 24.x with Swarm mode enabled
+- Docker Compose >= 2.x (for local build)
+
+### 1. Initialize Docker Swarm
 
 ```bash
 docker swarm init
 ```
 
-### Build da imagem
+### 2. Build the backend image
 
 ```bash
+# Standard build
 docker build -t nginx-flask-swarm-backend:latest ./backend
+
+# Or using multi-stage build (smaller image)
+docker build -f backend/Dockerfile.multistage -t nginx-flask-swarm-backend:latest ./backend
 ```
 
-### Subindo o stack
+### 3. Deploy the stack
 
 ```bash
-docker stack deploy -c docker-stack.yml flask-swarm
+docker stack deploy -c docker-stack.yml nginx-flask-swarm
 ```
 
-### Verificando os serviços
+### 4. Check running services
 
 ```bash
-docker stack services flask-swarm
+# List all services and replicas
+docker service ls
+
+# Check replica status
+docker service ps nginx-flask-swarm_backend
 ```
 
-Aguarde até aparecer `2/2` no backend, `1/1` no Nginx e `1/1` no PostgreSQL.
+---
 
-### Testando os endpoints
+## 🔗 Available Endpoints
+
+| Endpoint | Description |
+|---|---|
+| `GET /` | Returns app status, container hostname and environment |
+| `GET /health` | Application health check — returns `{ "status": "healthy" }` |
+| `GET /db-test` | Tests PostgreSQL connection and returns server version |
+| `GET /visitas` | Inserts a visit record and returns total count + serving hostname |
+| `GET /nginx-health` | Nginx health check — responds without hitting Flask |
+
+### Testing
 
 ```bash
-# Endpoint principal
+# Main endpoint
 curl http://localhost/
 
-# Health check
+# Application health check
 curl http://localhost/health
 
-# Informações da app
-curl http://localhost/info
-
-# Testa conexão com o banco
+# Test database connection
 curl http://localhost/db-test
 
-# Registra e conta visitas (persiste no banco)
+# Register a visit (run multiple times to see load balancing in action)
 curl http://localhost/visitas
 
-# Health check do Nginx
+# Nginx health check
 curl http://localhost/nginx-health
 ```
 
-### Visualizando o load balance
+> 💡 **Tip:** Call `/visitas` multiple times and watch the `registrado_por` field alternate between different hostnames — proof that Swarm is distributing requests across both Flask replicas.
 
-Execute o comando abaixo várias vezes e observe o campo `hostname` mudando entre as réplicas:
+---
 
-```bash
-curl http://localhost/visitas
-```
-
-### Visualizando logs
+## 📋 Useful Commands
 
 ```bash
-# Backend
-docker service logs -f flask-swarm_backend
+# View logs from all replicas of a service
+docker service logs -f nginx-flask-swarm_backend
 
-# PostgreSQL
-docker service logs -f flask-swarm_postgres
+# Scale replicas up or down
+docker service scale nginx-flask-swarm_backend=3
 
-# Nginx
-docker service logs -f flask-swarm_nginx
-```
+# Remove the entire stack
+docker stack rm nginx-flask-swarm
 
-### Derrubando o stack
-
-```bash
-docker stack rm flask-swarm
-```
-
-### Verificando o volume após derrubar o stack
-
-```bash
+# List volumes (persistent data)
 docker volume ls
+
+# Leave Swarm mode
+docker swarm leave --force
 ```
 
-O volume `flask-swarm_postgres_data` persiste mesmo após o stack ser removido. Ao subir novamente, os dados estarão intactos.
+---
 
-## 📁 Estrutura do projeto
+## 📁 Project Structure
 
 ```
-.
+nginx-flask-swarm/
 ├── backend/
-│   ├── app.py            # Aplicação Flask
-│   ├── requirements.txt  # Dependências Python
-│   └── Dockerfile        # Imagem do backend
+│   ├── app.py                  # Flask app with PostgreSQL integration
+│   ├── requirements.txt        # Flask + Gunicorn + psycopg2-binary
+│   ├── dockerfile              # Standard Dockerfile
+│   └── Dockerfile.multistage   # Multi-stage build (optimized image)
 ├── nginx/
-│   └── nginx.conf        # Configuração do reverse proxy
-├── docker-stack.yml      # Orquestração via Docker Swarm
+│   └── nginx.conf              # Reverse proxy + load balancer config
+├── docker-stack.yml            # Swarm stack definition
 └── README.md
 ```
 
-## 🔍 Conceitos demonstrados
+---
 
-- **Docker Swarm** como orquestrador de containers
-- **Réplicas** — múltiplas instâncias do mesmo serviço
-- **Load Balancing** automático entre réplicas
-- **Docker Volumes** — persistência de dados do PostgreSQL
-- **Overlay Network** para comunicação entre serviços
-- **Restart Policy** para alta disponibilidade
-- **Update Config** para deploy sem downtime
-- **Reverse Proxy** com Nginx
-- **Variáveis de ambiente** para configuração por serviço
+## 🔍 Key Concepts Demonstrated
 
-## 🛠️ Tecnologias
+- **Docker Swarm orchestration** — deploying and managing services across a cluster
+- **Load balancing** — Nginx distributes traffic between 2 Flask replicas
+- **Overlay network** — enables container communication across multiple Swarm nodes
+- **Multi-stage build** — separate build and runtime stages for a smaller, cleaner final image
+- **Rolling update** — `parallelism: 1, delay: 10s` updates one replica at a time with zero downtime
+- **Persistent volume** — PostgreSQL data survives container restarts via `postgres_data` named volume
+- **Environment variables** — all credentials and config injected via Compose/Stack, never hardcoded
+- **Non-root user** — Flask runs as `appuser` inside the container (security best practice)
+- **Replica-aware logging** — `/visitas` records which hostname served each request, making load balancing observable
 
-| Tecnologia | Versão | Papel |
+---
+
+## 🛠️ Tech Stack
+
+| Technology | Version | Role |
 |---|---|---|
 | Nginx | 1.25 Alpine | Reverse Proxy + Load Balancer |
 | Python | 3.12 Slim | Runtime |
 | Flask | 3.0.3 | Web Framework |
 | Gunicorn | 22.0.0 | WSGI Server |
-| PostgreSQL | 16 Alpine | Banco de Dados |
-| Docker Swarm | - | Orquestração |
+| PostgreSQL | 16 Alpine | Relational Database |
+| psycopg2-binary | 2.9.9 | PostgreSQL driver for Python |
+| Docker Swarm | — | Container Orchestration |
 
 ---
+
+## 👤 Author
+
+**Raphael** — [raphadevops](https://github.com/raphadevops)
