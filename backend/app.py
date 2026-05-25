@@ -16,7 +16,7 @@ def get_db():
 @app.route("/")
 def home():
     return jsonify({
-        "message": "API rodando com sucesso!",
+        "message": "API is running successfully!",
         "hostname": socket.gethostname(),
         "environment": os.getenv("ENVIRONMENT", "development")
     })
@@ -35,14 +35,14 @@ def db_test():
         cur.close()
         conn.close()
         return jsonify({
-            "status": "conectado",
+            "status": "connected",
             "postgres": version[0]
         })
     except Exception as e:
-        return jsonify({"status": "erro", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route("/visitas")
-def visitas():
+@app.route("/visits")
+def visits():
     try:
         conn = get_db()
         cur = conn.cursor()
@@ -60,11 +60,11 @@ def visitas():
         cur.close()
         conn.close()
         return jsonify({
-            "total_visitas": total,
-            "registrado_por": socket.gethostname()
+            "total_visits": total,
+            "served_by": socket.gethostname()
         })
     except Exception as e:
-        return jsonify({"status": "erro", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
