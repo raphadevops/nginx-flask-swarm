@@ -2,6 +2,9 @@ from flask import Flask, jsonify
 import os
 import socket
 import psycopg2
+import time
+
+START_TIME = time.time()
 
 app = Flask(__name__)
 
@@ -48,14 +51,14 @@ def visits():
         conn = get_db()
         cur = conn.cursor()
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS visitas (
+            CREATE TABLE IF NOT EXISTS visits (
                 id SERIAL PRIMARY KEY,
                 hostname VARCHAR(100),
                 data TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
         cur.execute("INSERT INTO visitas (hostname) VALUES (%s);", (socket.gethostname(),))
-        cur.execute("SELECT COUNT(*) FROM visitas;")
+        cur.execute("SELECT COUNT(*) FROM visits;")
         total = cur.fetchone()[0]
         conn.commit()
         cur.close()
@@ -66,6 +69,34 @@ def visits():
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/metrics")
+def metrics():
+    uptime_seconds = init(time.time() - START_TIME)
+    hours, remainder = divmod(uptime_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    db_status = "unavailable"
+    total_visits = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM visits;")
+        total_visits = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+        db_status = "connected"
+    except Exception:
+        pass 
+    return jsonify({
+        "hostname": socket.gethostname(),
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "uptime": f"{hours}h {minutes}m {seconds}s",
+        "uptime_seconds": uptime_seconds,
+        "database": db_status,
+        "total_visits": total_visits
+        }
+    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
