@@ -9,11 +9,18 @@ START_TIME = time.time()
 app = Flask(__name__)
 
 def get_db():
+    secret_path = "/run/secrets/db_password"
+    if os.path.exists(secret_path):
+        with open(secret_path) as f:
+            password = f.read().strip()
+    else:
+        password = os.getenv("DB_PASSWORD", "")
+
     return psycopg2.connect(
         host=os.getenv("DB_HOST", "postgres"),
         database=os.getenv("DB_NAME", "flaskdb"),
         user=os.getenv("DB_USER", "flask"),
-        password=os.getenv("DB_PASSWORD", "flask123")
+        password=password
     )
 
 @app.route("/")
@@ -57,7 +64,7 @@ def visits():
                 data TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
-        cur.execute("INSERT INTO visitas (hostname) VALUES (%s);", (socket.gethostname(),))
+        cur.execute("INSERT INTO visits (hostname) VALUES (%s);", (socket.gethostname(),))
         cur.execute("SELECT COUNT(*) FROM visits;")
         total = cur.fetchone()[0]
         conn.commit()
@@ -72,7 +79,7 @@ def visits():
 
 @app.route("/metrics")
 def metrics():
-    uptime_seconds = init(time.time() - START_TIME)
+    uptime_seconds = int(time.time() - START_TIME)
     hours, remainder = divmod(uptime_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
 
@@ -95,8 +102,7 @@ def metrics():
         "uptime_seconds": uptime_seconds,
         "database": db_status,
         "total_visits": total_visits
-        }
-    })
+        })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
